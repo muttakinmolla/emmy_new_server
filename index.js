@@ -34,6 +34,13 @@ async function run() {
         });
 
 
+        // category get Api ==========================
+        app.get('/categories', async(req, res)=>{
+            const query ={};
+            const category = await categoryCollection.find(query).toArray();
+            res.send(category)
+        })
+
         // add category api====================
         app.post('/addCategory', async (req, res) => {
             const category = req.body;
