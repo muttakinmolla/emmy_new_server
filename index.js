@@ -23,6 +23,7 @@ async function run() {
 
         const categoryCollection = client.db('bikePicker').collection('categories');
         const usersCollection = client.db('bikePicker').collection('users');
+        const productsCollection = client.db('bikePicker').collection('products');
 
 
         // create user api =====================================================
@@ -35,8 +36,8 @@ async function run() {
 
 
         // category get Api ==========================
-        app.get('/categories', async(req, res)=>{
-            const query ={};
+        app.get('/categories', async (req, res) => {
+            const query = {};
             const category = await categoryCollection.find(query).toArray();
             res.send(category)
         })
@@ -46,6 +47,21 @@ async function run() {
             const category = req.body;
             const result = await categoryCollection.insertOne(category);
             res.send(result);
+        });
+
+
+        // add product api ================================
+        app.post('/addProduct', async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result);
+        });
+
+        // get product api =============================
+        app.get('/allProduct', async (req, res) => {
+            const query = {};
+            const products = await productsCollection.find(query).toArray();
+            res.send(products);
         })
 
     }
