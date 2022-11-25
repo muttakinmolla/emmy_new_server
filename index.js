@@ -16,6 +16,22 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 })
 
 
+function verifyJwt(req, res, next) {
+    console.log('inside_token:', req.headers.authorization);
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+        return res.status(401).send('unauthorized access')
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN, function (error, decoded) {
+        if (error) {
+            return res.status(403).send({ message: 'forbidden Access' })
+        }
+        req.decoded = decoded
+        next();
+    })
+
+}
 
 
 async function run() {
@@ -43,15 +59,37 @@ async function run() {
         // create user api =====================================================
         app.post('/users', async (req, res) => {
             const user = req.body;
+            const query = { email: user.email }
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
 
-        app.get('/allUsers', async (req, res) => {
-            const query = {};
-            const users = await usersCollection.find(query).toArray();
+        app.get('/allUsers', verifyJwt, async (req, res) => {
+
+            const allUsers = {};
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail }
+            const user = await usersCollection.findOne(query);
+
+            if (user?.userType !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' })
+            }
+            const users = await usersCollection.find(allUsers).toArray();
             res.send(users);
         });
+
+        // for user type checking ==================================
+        // users admin or not api =======================================================
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email };
+            const user = await usersCollection.findOne(query);
+            res.send({
+                isAdmin: user?.userType === 'admin',
+                isBuyer: user?.userType === 'buyer',
+                isSeller: user?.userType === 'seller'
+            });
+        })
 
         // delete data ====================================================================================
         app.delete('/users/:id', async (req, res) => {
@@ -77,7 +115,7 @@ async function run() {
         });
 
 
-        // add product api ================================
+        // add product api ===============================
         app.post('/addProduct', async (req, res) => {
             const product = req.body;
             const result = await productsCollection.insertOne(product);
@@ -85,8 +123,13 @@ async function run() {
         });
 
         // get product api =============================
-        app.get('/allProduct', async (req, res) => {
+        app.get('/allProduct', verifyJwt, async (req, res) => {
             const email = req.query.email;
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                res.status(403).send({ message: 'forbidden access' })
+            }
             const query = { email: email };
             const products = await productsCollection.find(query).toArray();
             res.send(products);
