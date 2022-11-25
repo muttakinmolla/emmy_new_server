@@ -136,7 +136,12 @@ async function run() {
         });
 
 
-
+        // get all product api for buyer ========================================
+        app.get('/products', async(req, res)=>{
+            const query = {};
+            const products = await productsCollection.find(query).toArray();
+            res.send(products);
+        })
 
     }
     finally {
