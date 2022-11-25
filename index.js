@@ -59,7 +59,7 @@ async function run() {
         // create user api =====================================================
         app.post('/users', async (req, res) => {
             const user = req.body;
-            const query = { email: user.email }
+            const email = { email: user.email }
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
