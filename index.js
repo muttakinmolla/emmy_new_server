@@ -26,6 +26,20 @@ async function run() {
         const productsCollection = client.db('bikePicker').collection('products');
 
 
+        // jwt web token ========================================
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email }
+            const user = await usersCollection.findOne(query);
+            if (user) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
+                return res.send({ accessToken: token })
+            }
+            console.log(user);
+            res.status(403).send({ accessToken: ' ' });
+        })
+
+
         // create user api =====================================================
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -72,7 +86,8 @@ async function run() {
 
         // get product api =============================
         app.get('/allProduct', async (req, res) => {
-            const query = {};
+            const email = req.query.email;
+            const query = { email: email };
             const products = await productsCollection.find(query).toArray();
             res.send(products);
         });
