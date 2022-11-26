@@ -219,10 +219,23 @@ async function run() {
         });
 
         // order post api ============================================
-        app.post('/order', async(req, res)=>{
+        app.post('/order', async (req, res) => {
             const order = req.body;
             const result = await orderCollection.insertOne(order);
             res.send(result);
+        })
+
+        // order get api ====================================
+        app.get('/order', verifyJwt, async (req, res) => {
+            const email = req.query.email;
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                res.status(403).send({ message: 'forbidden access' })
+            }
+            const query = { buyer_email: email };
+            const products = await orderCollection.find(query).toArray();
+            res.send(products);
         })
 
     }
