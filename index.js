@@ -53,7 +53,20 @@ async function run() {
             }
             console.log(user);
             res.status(403).send({ accessToken: ' ' });
-        })
+        });
+
+
+        // verify admin function ====================================
+        const verifyAdmin = async (req, res, next) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail };
+            const user = await usersCollection.findOne(query);
+
+            if (user?.userType !== 'admin') {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+            next()
+        }
 
 
         // create user api =====================================================
@@ -76,6 +89,19 @@ async function run() {
             }
             const users = await usersCollection.find(allUsers).toArray();
             res.send(users);
+        });
+
+        app.put('/allUser/verify/:id', verifyJwt, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    isVerified: 'verify'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
         });
 
         // for user type checking ==================================
@@ -137,11 +163,29 @@ async function run() {
 
 
         // get all product api for buyer ========================================
-        app.get('/products', async(req, res)=>{
+        app.get('/products', async (req, res) => {
             const query = {};
             const products = await productsCollection.find(query).toArray();
             res.send(products);
         })
+
+        // get product by Category ===========================================
+        // app.get('/products/category', async (req, res) => {
+        //     const id = req.query.category;
+        //     const query = {}
+        //     const options = await categoryCollection.find(query).toArray();
+        //     // get date form database booking collection which is a cloumn appointmentDate
+        //     const category = { category: id }
+        //     // get excat data form database which is query by date
+        //     const alreadyBooked = await productsCollection.find(category).toArray();
+        //     options.forEach(option => {
+        //         const optionBooked = alreadyBooked.filter(book => book.treatment === option.name);
+        //         const bookedSlots = optionBooked.map(book => book.slot);
+        //         const remainingSlots = option.slots.filter(slot => !bookedSlots.includes(slot));
+        //         option.slots = remainingSlots;
+        //     })
+        //     res.send(options);
+        // })
 
     }
     finally {
