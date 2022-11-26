@@ -41,6 +41,7 @@ async function run() {
         const usersCollection = client.db('bikePicker').collection('users');
         const productsCollection = client.db('bikePicker').collection('products');
         const wishlistCollection = client.db('bikePicker').collection('wishlist');
+        const orderCollection = client.db('bikePicker').collection('orders');
 
 
         // jwt web token ========================================
@@ -92,6 +93,14 @@ async function run() {
             res.send(users);
         });
 
+        app.get('/verifiedUser/:email', async (req, res) => {
+            const email = req.params.email;
+            console.log(email);
+            const userEmail = { email: email };
+            const result = await usersCollection.findOne(userEmail);
+            res.send(result);
+        })
+
         app.put('/allUser/verify/:id', verifyJwt, verifyAdmin, async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id) };
@@ -116,7 +125,8 @@ async function run() {
                 isBuyer: user?.userType === 'buyer',
                 isSeller: user?.userType === 'seller'
             });
-        })
+        });
+
 
         // delete data ====================================================================================
         app.delete('/users/:id', async (req, res) => {
@@ -171,9 +181,9 @@ async function run() {
         })
 
         // get product by id =====================================
-        app.get('/product/:id', async (req, res)=>{
+        app.get('/product/:id', async (req, res) => {
             const id = req.params.id;
-            const product = {_id: ObjectId(id)};
+            const product = { _id: ObjectId(id) };
             const result = await productsCollection.findOne(product);
             res.send(result);
         })
@@ -206,6 +216,13 @@ async function run() {
             const query = { userEmail: email };
             const products = await wishlistCollection.find(query).toArray();
             res.send(products);
+        });
+
+        // order post api ============================================
+        app.post('/order', async(req, res)=>{
+            const order = req.body;
+            const result = await orderCollection.insertOne(order);
+            res.send(result);
         })
 
     }
