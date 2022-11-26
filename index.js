@@ -40,6 +40,7 @@ async function run() {
         const categoryCollection = client.db('bikePicker').collection('categories');
         const usersCollection = client.db('bikePicker').collection('users');
         const productsCollection = client.db('bikePicker').collection('products');
+        const wishlistCollection = client.db('bikePicker').collection('wishlist');
 
 
         // jwt web token ========================================
@@ -176,6 +177,26 @@ async function run() {
             const category = { category: id }
 
             const products = await productsCollection.find(category).toArray();
+            res.send(products);
+        });
+
+        // wishlist post api ===================================================
+        app.post('/wishlist', async (req, res) => {
+            const product = req.body;
+            const result = await wishlistCollection.insertOne(product);
+            res.send(result);
+        })
+
+        // wishlist get api ====================================
+        app.get('/wishlist', verifyJwt, async (req, res) => {
+            const email = req.query.email;
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                res.status(403).send({ message: 'forbidden access' })
+            }
+            const query = { userEmail: email };
+            const products = await wishlistCollection.find(query).toArray();
             res.send(products);
         })
 
