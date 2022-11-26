@@ -170,22 +170,14 @@ async function run() {
         })
 
         // get product by Category ===========================================
-        // app.get('/products/category', async (req, res) => {
-        //     const id = req.query.category;
-        //     const query = {}
-        //     const options = await categoryCollection.find(query).toArray();
-        //     // get date form database booking collection which is a cloumn appointmentDate
-        //     const category = { category: id }
-        //     // get excat data form database which is query by date
-        //     const alreadyBooked = await productsCollection.find(category).toArray();
-        //     options.forEach(option => {
-        //         const optionBooked = alreadyBooked.filter(book => book.treatment === option.name);
-        //         const bookedSlots = optionBooked.map(book => book.slot);
-        //         const remainingSlots = option.slots.filter(slot => !bookedSlots.includes(slot));
-        //         option.slots = remainingSlots;
-        //     })
-        //     res.send(options);
-        // })
+        app.get('/products/category/:id', async (req, res) => {
+            const id = req.params.id;
+
+            const category = { category: id }
+
+            const products = await productsCollection.find(category).toArray();
+            res.send(products);
+        })
 
     }
     finally {
