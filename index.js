@@ -170,6 +170,14 @@ async function run() {
             res.send(products);
         })
 
+        // get product by id =====================================
+        app.get('/product/:id', async (req, res)=>{
+            const id = req.params.id;
+            const product = {_id: ObjectId(id)};
+            const result = await productsCollection.findOne(product);
+            res.send(result);
+        })
+
         // get product by Category ===========================================
         app.get('/products/category/:id', async (req, res) => {
             const id = req.params.id;
