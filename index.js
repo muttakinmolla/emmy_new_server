@@ -177,7 +177,8 @@ async function run() {
         // get all product api for buyer ========================================
         app.get('/products', async (req, res) => {
             const query = {};
-            const products = await productsCollection.find(query).toArray();
+            const allProducts = await productsCollection.find(query).toArray();
+            const products =  allProducts.filter(product=> product.status === 'inStock');;
             res.send(products);
         })
 
