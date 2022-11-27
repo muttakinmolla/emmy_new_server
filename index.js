@@ -42,6 +42,7 @@ async function run() {
         const productsCollection = client.db('bikePicker').collection('products');
         const wishlistCollection = client.db('bikePicker').collection('wishlist');
         const orderCollection = client.db('bikePicker').collection('orders');
+        const reportCollection = client.db('bikePicker').collection('reports');
 
 
         // jwt web token ========================================
@@ -236,6 +237,13 @@ async function run() {
             const query = { buyer_email: email };
             const products = await orderCollection.find(query).toArray();
             res.send(products);
+        });
+
+        //  report product api ======================================
+        app.post('/report', async (req, res) => {
+            const product = req.body;
+            const result = await reportCollection.insertOne(product);
+            res.send(result);
         })
 
     }
