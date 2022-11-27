@@ -54,7 +54,6 @@ async function run() {
                 const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
                 return res.send({ accessToken: token })
             }
-            console.log(user);
             res.status(403).send({ accessToken: ' ' });
         });
 
@@ -75,7 +74,15 @@ async function run() {
         // create user api =====================================================
         app.post('/users', async (req, res) => {
             const user = req.body;
-            const email = { email: user.email }
+            const email = { email: user.email };
+
+            const storedEmail = await usersCollection.find(email).toArray();
+            const userEmail = storedEmail.filter(storMail => storMail.email !== email);
+            // console.log(email.email, 'userEmail:', userEmail[0].email)
+
+            if (userEmail[0].email === email.email) {
+                return res.send({ message: 'already have this email' });
+            };
             const result = await usersCollection.insertOne(user);
             res.send(result);
         });
@@ -96,7 +103,6 @@ async function run() {
 
         app.get('/verifiedUser/:email', async (req, res) => {
             const email = req.params.email;
-            console.log(email);
             const userEmail = { email: email };
             const result = await usersCollection.findOne(userEmail);
             res.send(result);
@@ -178,7 +184,7 @@ async function run() {
         app.get('/products', async (req, res) => {
             const query = {};
             const allProducts = await productsCollection.find(query).toArray();
-            const products =  allProducts.filter(product=> product.status === 'inStock');;
+            const products = allProducts.filter(product => product.status === 'inStock');
             res.send(products);
         })
 
