@@ -244,7 +244,15 @@ async function run() {
             const product = req.body;
             const result = await reportCollection.insertOne(product);
             res.send(result);
-        })
+        });
+
+        // report get api for admin only ===============================
+        app.get('/report', verifyJwt, verifyAdmin, async (req, res) => {
+
+            const query = {};
+            const products = await reportCollection.find(query).toArray();
+            res.send(products);
+        });
 
     }
     finally {
