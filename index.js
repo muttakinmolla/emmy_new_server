@@ -158,6 +158,14 @@ async function run() {
             res.send(result);
         });
 
+        // delete data ====================================================================================
+        app.delete('/category/:id', verifyJwt, verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await categoryCollection.deleteOne(query);
+            res.send(result)
+        });
+
 
         // add product api ===============================
         app.post('/addProduct', async (req, res) => {
