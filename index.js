@@ -254,6 +254,33 @@ async function run() {
             res.send(products);
         });
 
+        // get Buyer api ============================================
+        app.get('/buyer', verifyJwt, async (req, res) => {
+            const email = req.query.email;
+
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                res.status(403).send({ message: 'forbidden access' })
+            }
+            const query = { seller_email: email };
+            const products = await orderCollection.find(query).toArray();
+            res.send(products);
+        });
+
+        // product status update api ==============================
+        app.put('/product/status/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: {
+                    status: 'sold'
+                }
+            }
+            const result = await productsCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
+        });
+
     }
     finally {
 
