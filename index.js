@@ -254,6 +254,15 @@ async function run() {
             res.send(products);
         });
 
+        // order get api for frontend loggedin user shwoing cart quantity====================================
+        app.get('/myOrder', async (req, res) => {
+            const email = req.query.email;
+            
+            const query = { buyer_email: email };
+            const products = await orderCollection.find(query).toArray();
+            res.send(products);
+        });
+
         //  report product api ======================================
         app.post('/report', async (req, res) => {
             const product = req.body;
