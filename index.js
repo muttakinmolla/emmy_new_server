@@ -3,14 +3,29 @@ const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 
 const port = process.env.PORT || 5000;
 const app = express();
 
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads');
+    },
+    filename: (req, file, cb) => {
+        cb(null, `${Date.now()}_${file.originalname}`);
+    }
+})
+const upload = multer({ storage: storage });
+
+
 // middleware =============================
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static('uploads'));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.9mm1y.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 })
@@ -36,278 +51,290 @@ function verifyJwt(req, res, next) {
 
 async function run() {
     try {
+        // Connect the client to the server	(optional starting in v4.7)
+        await client.connect();
 
-        const categoryCollection = client.db('bikePicker').collection('categories');
-        const usersCollection = client.db('bikePicker').collection('users');
-        const productsCollection = client.db('bikePicker').collection('products');
-        const wishlistCollection = client.db('bikePicker').collection('wishlist');
-        const orderCollection = client.db('bikePicker').collection('orders');
-        const reportCollection = client.db('bikePicker').collection('reports');
+        const myProfileCollection = client.db('emmy_canada').collection('my_profile');
+        const myProjectCollection = client.db('emmy_canada').collection('projects');
+        const myCategoryCollection = client.db('emmy_canada').collection('category');
+        const myUploadCollection = client.db('emmy_canada').collection('upload');
+        const mySettingsCollection = client.db('emmy_canada').collection('setting');
 
-
-        // jwt web token ========================================
-        app.get('/jwt', async (req, res) => {
-            const email = req.query.email;
-            const query = { email: email }
-            const user = await usersCollection.findOne(query);
-            if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '1h' });
-                return res.send({ accessToken: token })
-            }
-            res.status(403).send({ accessToken: ' ' });
-        });
-
+        // Authentication API
 
         // verify admin function ====================================
         const verifyAdmin = async (req, res, next) => {
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail };
-            const user = await usersCollection.findOne(query);
-
-            if (user?.userType !== 'admin') {
-                return res.status(403).send({ message: 'forbidden access' });
+            if (!req.headers.authorization) {
+                return res.status(401).json({ error: "Not Authorized" });
             }
-            next()
+
+            // Bearer token
+            const authHeader = req.headers.authorization;
+            const token = authHeader.split(" ")[1];
+
+            try {
+                // Verify the token is valid
+                const { user } = jwt.verify(token, process.env.JWT_SECRET);
+                next();
+            } catch (error) {
+                return res.status(401).json({ error: "Not Authorized" });
+            }
         }
 
+        // login
+        app.post('/login', (req, res) => {
+            const { email, password } = req.body;
+            if (email == "emitooo852@gmail.com" && password == "admin1234") {
+                const token = jwt.sign({ user: "admin" }, process.env.JWT_SECRET);
+                return res.send({ accessToken: token });
+            } else {
+                return res
+                    .status(401)
+                    .json({ message: "The username and password your provided are invalid" });
+            }
+        });
 
-        // create user api =====================================================
-        app.post('/users', async (req, res) => {
-            const user = req.body;
-            const email = { email: user.email };
-            console.log('user:', email)
+        // logout
+        app.get('/logout', verifyAdmin, (req, res) => {
+            return res.send({ message: 'Logout Successfull!' });
+        });
 
-            const storedEmail = await usersCollection.findOne(email);
-            if (!storedEmail) {
-                const result = await usersCollection.insertOne(user);
+        // profile save routes=======================================================================
+        app.put('/myProfile', verifyAdmin, upload.single('thumbnail'), async (req, res) => {
+            console.log(req.file)
+            let info = req.body;
+            const collection = await myProfileCollection.find({}).toArray();
+            if (collection.length > 0) {
+                const filter = { _id: new ObjectId(collection[0]._id) };
+                if (req.file) {
+                    info.thumbnail = `uploads/${req.file.filename}`;
+                    const data = await myProfileCollection.find(filter).toArray();
+                    if (data[0].thumbnail) {
+                        fs.unlink(data[0].thumbnail, (e) => { console.log(e) });
+                    }
+                }
+                const options = { upsert: true };
+                const updateDoc = {
+                    $set: info,
+                }
+                const result = await myProfileCollection.updateOne(filter, updateDoc, options);
                 res.send(result);
             } else {
-                res.send({ message: 'already have an account in thi email' })
+                if (req.file) {
+                    info.thumbnail = `uploads/${req.file.filename}`;
+                }
+                const result = await myProfileCollection.insertOne(info);
+                res.send(result);
             }
-
         });
 
-        app.get('/allUsers', verifyJwt, async (req, res) => {
-
-            const allUsers = {};
-            const decodedEmail = req.decoded.email;
-            const query = { email: decodedEmail }
-            const user = await usersCollection.findOne(query);
-
-            if (user?.userType !== 'admin') {
-                return res.status(403).send({ message: 'forbidden access' })
-            }
-            const users = await usersCollection.find(allUsers).toArray();
-            res.send(users);
+        // profile get routes=======================================================================
+        app.get('/myProfile', async (req, res) => {
+            const collection = await myProfileCollection.find({}).toArray();
+            const id = new ObjectId(collection[0]._id);
+            const profiles = await myProfileCollection.findOne(id);
+            res.send(profiles);
         });
 
-        app.get('/verifiedUser/:email', async (req, res) => {
-            const email = req.params.email;
-            const userEmail = { email: email };
-            const result = await usersCollection.findOne(userEmail);
+        // projects get routes=======================================================================
+        app.get('/projects', async (req, res) => {
+            const info = req.body;
+            const result = await myProjectCollection.find({}).toArray();
             res.send(result);
-        })
+        });
 
-        app.put('/allUser/verify/:id', verifyJwt, verifyAdmin, async (req, res) => {
+
+        // projects save routes=======================================================================
+        app.post('/myProjects', verifyAdmin, async (req, res) => {
+            const info = req.body;
+            const result = await myProjectCollection.insertOne(info);
+            res.send(result);
+        });
+
+        // projects edit routes=======================================================================
+        app.get('/myProjects/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = { _id: ObjectId(id) };
+            const project = new ObjectId(id);
+
+            const projects = await myProjectCollection.find(project).toArray();
+            res.send(projects);
+        });
+
+        // projects update routes=======================================================================
+        app.put('/myProject/update/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id)
+            const info = req.body;
+            const filter = { _id: new ObjectId(id) };
             const options = { upsert: true };
             const updateDoc = {
-                $set: {
-                    isVerified: 'verify'
-                }
+                $set: info,
             }
-            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            const result = await myProjectCollection.updateOne(filter, updateDoc, options);
             res.send(result);
         });
 
-        // for user type checking ==================================
-        // users admin or not api =======================================================
-        app.get('/users/admin/:email', async (req, res) => {
-            const email = req.params.email;
-            const query = { email };
-            const user = await usersCollection.findOne(query);
-            res.send({
-                isAdmin: user?.userType === 'admin',
-                isBuyer: user?.userType === 'buyer',
-                isSeller: user?.userType === 'seller'
-            });
-        });
 
-
-        // delete data ====================================================================================
-        app.delete('/users/:id', async (req, res) => {
+        // project delete data ====================================================================================
+        app.delete('/myProject/delete/:id', verifyAdmin, async (req, res) => {
             const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const result = await usersCollection.deleteOne(query);
+            const query = { _id: new ObjectId(id) };
+            const result = await myProjectCollection.deleteOne(query);
             res.send(result)
         });
 
 
-        // category get Api ==========================
-        app.get('/categories', async (req, res) => {
-            const query = {};
-            const category = await categoryCollection.find(query).toArray();
-            res.send(category)
-        })
-
-        // add category api====================
-        app.post('/addCategory', async (req, res) => {
-            const category = req.body;
-            const result = await categoryCollection.insertOne(category);
+        // categories get routes=======================================================================
+        app.get('/myCategory', async (req, res) => {
+            const result = await myCategoryCollection.find({}).toArray();
             res.send(result);
         });
 
-        // delete data ====================================================================================
-        app.delete('/category/:id', verifyJwt, verifyAdmin, async (req, res) => {
+
+        // category save routes=======================================================================
+        app.post('/myCategory', verifyAdmin, async (req, res) => {
+            const info = req.body;
+            const result = await myCategoryCollection.insertOne(info);
+            res.send(result);
+            console.log(result);
+        });
+
+
+        // category edit routes=======================================================================
+        app.get('/myCategory/:id', async (req, res) => {
             const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const result = await categoryCollection.deleteOne(query);
+            const project = new ObjectId(id);
+
+            const projects = await myCategoryCollection.find(project).toArray();
+            res.send(projects);
+        });
+
+        // projects update routes=======================================================================
+
+        app.put('/myCategory/update/:id', verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const info = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: info,
+            }
+            const result = await myCategoryCollection.updateOne(filter, updateDoc, options);
+            res.send(result);
+        });
+
+
+        // category delete data ====================================================================================
+        app.delete('/myCategory/delete/:id', verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const result = await myCategoryCollection.deleteOne(query);
             res.send(result)
         });
 
 
-        // add product api ===============================
-        app.post('/addProduct', async (req, res) => {
-            const product = req.body;
-            const result = await productsCollection.insertOne(product);
+        // uploads get routes=======================================================================
+        app.get('/myuploads', async (req, res) => {
+            const result = await myUploadCollection.find({}).toArray();
             res.send(result);
         });
 
-        // get product api =============================
-        app.get('/allProduct', verifyJwt, async (req, res) => {
-            const email = req.query.email;
 
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                res.status(403).send({ message: 'forbidden access' })
-            }
-            const query = { email: email };
-            const products = await productsCollection.find(query).toArray();
-            res.send(products);
+        // uploads save routes=======================================================================
+        app.post('/myuploads', verifyAdmin, upload.single('thumbnail'), async (req, res) => {
+            const info = req.body;
+            info.thumbnail = `uploads/${req.file.filename}`;
+            const result = await myUploadCollection.insertOne(info);
+            res.send(result);
         });
 
 
-        // get all product api for buyer ========================================
-        app.get('/products', async (req, res) => {
-            const query = {};
-            const allProducts = await productsCollection.find(query).toArray();
-            const products = allProducts.filter(product => product.status === 'inStock');
-            res.send(products);
-        })
+        // uploads edit routes=======================================================================
+        app.get('/category/uploads/:name', async (req, res) => {
+            const name = req.params.name;
+            const filter = { category: name };
+            const projects = await myUploadCollection.find(filter).toArray();
+            res.send(projects);
+        });
 
-        // get product by id =====================================
-        app.get('/product/:id', async (req, res) => {
+        // uploads update routes=======================================================================
+        app.put('/myuploads/update/:id', verifyAdmin, upload.single('thumbnail'), async (req, res) => {
             const id = req.params.id;
-            const product = { _id: ObjectId(id) };
-            const result = await productsCollection.findOne(product);
-            res.send(result);
-        })
-
-        // get product by Category ===========================================
-        app.get('/products/category/:id', async (req, res) => {
-            const id = req.params.id;
-
-            const category = { category: id }
-
-            const products = await productsCollection.find(category).toArray();
-            res.send(products);
-        });
-
-        // wishlist post api ===================================================
-        app.post('/wishlist', async (req, res) => {
-            const product = req.body;
-            const result = await wishlistCollection.insertOne(product);
-            res.send(result);
-        })
-
-        // wishlist get api ====================================
-        app.get('/wishlist', verifyJwt, async (req, res) => {
-            const email = req.query.email;
-
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                res.status(403).send({ message: 'forbidden access' })
-            }
-            const query = { userEmail: email };
-            const products = await wishlistCollection.find(query).toArray();
-            res.send(products);
-        });
-
-        // order post api ============================================
-        app.post('/order', async (req, res) => {
-            const order = req.body;
-            const result = await orderCollection.insertOne(order);
-            res.send(result);
-        })
-
-        // order get api ====================================
-        app.get('/order', verifyJwt, async (req, res) => {
-            const email = req.query.email;
-
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                res.status(403).send({ message: 'forbidden access' })
-            }
-            const query = { buyer_email: email };
-            const products = await orderCollection.find(query).toArray();
-            res.send(products);
-        });
-
-        // order get api for frontend loggedin user shwoing cart quantity====================================
-        app.get('/myOrder', async (req, res) => {
-            const email = req.query.email;
-
-            const query = { buyer_email: email };
-            const products = await orderCollection.find(query).toArray();
-            res.send(products);
-        });
-
-        //  report product api ======================================
-        app.post('/report', async (req, res) => {
-            const product = req.body;
-            const result = await reportCollection.insertOne(product);
-            res.send(result);
-        });
-
-        // report get api for admin only ===============================
-        app.get('/report', verifyJwt, verifyAdmin, async (req, res) => {
-
-            const query = {};
-            const products = await reportCollection.find(query).toArray();
-            res.send(products);
-        });
-
-        // get Buyer api ============================================
-        app.get('/buyer', verifyJwt, async (req, res) => {
-            const email = req.query.email;
-
-            const decodedEmail = req.decoded.email;
-            if (email !== decodedEmail) {
-                res.status(403).send({ message: 'forbidden access' })
-            }
-            const query = { seller_email: email };
-            const products = await orderCollection.find(query).toArray();
-            res.send(products);
-        });
-
-        // product status update api ==============================
-        app.put('/product/status/:id', async (req, res) => {
-            const id = req.params.id;
-            const filter = { _id: ObjectId(id) };
-            const options = { upsert: true };
-            const updateDoc = {
-                $set: {
-                    status: 'sold'
+            const info = req.body;
+            const filter = { _id: new ObjectId(id) };
+            if (req.file) {
+                info.thumbnail = `uploads/${req.file.filename}`;
+                const data = await myUploadCollection.find(filter).toArray();
+                if (data.thumbnail) {
+                    fs.unlink(data.thumbnail, (e) => { console.log(e) });
                 }
             }
-            const result = await productsCollection.updateOne(filter, updateDoc, options);
+            const options = { upsert: true };
+            const updateDoc = {
+                $set: info,
+            }
+            const result = await myUploadCollection.updateOne(filter, updateDoc, options);
             res.send(result);
         });
 
-    }
-    finally {
 
+        // uploads delete data ====================================================================================
+        app.delete('/myuploads/delete/:id', verifyAdmin, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) };
+            const data = await myUploadCollection.find(query).toArray();
+            if (data[0].thumbnail) {
+                fs.unlink(data[0].thumbnail, (e) => { console.log(e) });
+            }
+            const result = await myUploadCollection.deleteOne(query);
+            res.send(result)
+        });
+
+
+        // settings save routes=======================================================================
+        app.put('/pagesettings', verifyAdmin, upload.single('thumbnail'), async (req, res) => {
+            let info = req.body;
+            const collection = await mySettingsCollection.find({}).toArray();
+            if (collection.length > 0) {
+                const filter = { _id: new ObjectId(collection[0]._id) };
+                if (req.file) {
+                    info.thumbnail = `uploads/${req.file.filename}`;
+                    const data = await mySettingsCollection.find(filter).toArray();
+                    if (data[0].thumbnail) {
+                        fs.unlink(data[0].thumbnail, (e) => { console.log(e) });
+                    }
+                }
+                const options = { upsert: true };
+                const updateDoc = {
+                    $set: info,
+                }
+                const result = await mySettingsCollection.updateOne(filter, updateDoc, options);
+                res.send(result);
+            } else {
+                if (req.file) {
+                    info.thumbnail = `uploads/${req.file.filename}`;
+                }
+                const result = await mySettingsCollection.insertOne(info);
+                res.send(result);
+            }
+        });
+
+        // settings get routes=======================================================================
+        app.get('/pagesettings', async (req, res) => {
+            const collection = await mySettingsCollection.find({}).toArray();
+            if (collection.length > 0) {
+                const id = new ObjectId(collection[0]._id);
+                const profiles = await mySettingsCollection.findOne(id);
+                res.send(profiles);
+            }
+        });
+
+
+        await client.db("admin").command({ ping: 1 });
+        console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+        // Ensures that the client will close when you finish/error
+        // await client.close();
     }
 }
 run().catch(console.log());
@@ -315,4 +342,4 @@ run().catch(console.log());
 app.get('/', async (req, res) => {
     res.send('bike pickers server is running')
 })
-app.listen(port, () => console.log(`bike pickers running On: ${port}`))
+app.listen(port, () => console.log(`emmy server running On: ${port}`))
