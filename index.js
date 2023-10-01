@@ -340,6 +340,6 @@ async function run() {
 run().catch(console.log());
 
 app.get('/', async (req, res) => {
-    res.send('bike pickers server is running')
+    res.send(' emmy server is running')
 })
 app.listen(port, () => console.log(`emmy server running On: ${port}`))
