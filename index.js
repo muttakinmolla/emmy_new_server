@@ -257,7 +257,7 @@ async function run() {
         // order get api for frontend loggedin user shwoing cart quantity====================================
         app.get('/myOrder', async (req, res) => {
             const email = req.query.email;
-            
+
             const query = { buyer_email: email };
             const products = await orderCollection.find(query).toArray();
             res.send(products);
