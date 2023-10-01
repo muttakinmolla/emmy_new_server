@@ -52,7 +52,7 @@ function verifyJwt(req, res, next) {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const myProfileCollection = client.db('emmy_canada').collection('my_profile');
         const myProjectCollection = client.db('emmy_canada').collection('projects');
